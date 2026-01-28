@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
-import { Shield, Eye, EyeOff, ArrowLeft, Home, Car } from "lucide-react";
+import { Shield, Eye, EyeOff, ArrowLeft, Home, Car, Chrome } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -35,6 +35,9 @@ export default function Auth() {
   const [isSignUp, setIsSignUp] = useState(searchParams.get("mode") === "signup");
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [isGoogleLoading, setIsGoogleLoading] = useState(false);
+
+  const { signInWithGoogle } = useAuth();
 
   // Form states
   const [fullName, setFullName] = useState("");
@@ -50,6 +53,28 @@ export default function Auth() {
       navigate("/");
     }
   }, [user, loading, navigate]);
+
+  const handleGoogleSignIn = async () => {
+    setIsGoogleLoading(true);
+    try {
+      const { error } = await signInWithGoogle();
+      if (error) {
+        toast({
+          title: "Erro ao fazer login com Google",
+          description: error.message,
+          variant: "destructive",
+        });
+      }
+    } catch {
+      toast({
+        title: "Erro inesperado",
+        description: "Ocorreu um erro ao fazer login com Google",
+        variant: "destructive",
+      });
+    } finally {
+      setIsGoogleLoading(false);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -325,6 +350,28 @@ export default function Auth() {
                     : "Entrar"}
                 </Button>
               </form>
+
+              <div className="mt-4">
+                <div className="relative">
+                  <div className="absolute inset-0 flex items-center">
+                    <div className="w-full border-t border-border"></div>
+                  </div>
+                  <div className="relative flex justify-center text-xs uppercase">
+                    <span className="bg-background px-2 text-muted-foreground">Ou</span>
+                  </div>
+                </div>
+              </div>
+
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full mt-4"
+                onClick={handleGoogleSignIn}
+                disabled={isGoogleLoading}
+              >
+                <Chrome className="mr-2 h-4 w-4" />
+                {isGoogleLoading ? "Conectando..." : "Continuar com Google"}
+              </Button>
 
               <div className="mt-6 text-center text-sm">
                 {isSignUp ? (

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Menu, X, Shield, User, LogOut } from "lucide-react";
+import { Menu, X, Shield, User, LogOut, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -61,13 +61,20 @@ export function Header() {
           {loading ? (
             <div className="h-9 w-24 bg-muted animate-pulse rounded-md" />
           ) : user ? (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="sm" className="gap-2">
-                  <User className="h-4 w-4" />
-                  Minha Conta
-                </Button>
-              </DropdownMenuTrigger>
+            <>
+              <Button size="sm" className="gap-2" asChild>
+                <Link to="/publish">
+                  <Plus className="h-4 w-4" />
+                  Anunciar
+                </Link>
+              </Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="sm" className="gap-2">
+                    <User className="h-4 w-4" />
+                    Minha Conta
+                  </Button>
+                </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-48">
                 <DropdownMenuItem asChild>
                   <Link to="/perfil">Meu Perfil</Link>
@@ -83,8 +90,13 @@ export function Header() {
                   <LogOut className="h-4 w-4 mr-2" />
                   Sair
                 </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem asChild>
+                  <Link to="/expert">Painel Especialista</Link>
+                </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
+            </>
           ) : (
             <>
               <Button variant="ghost" size="sm" asChild>
@@ -139,6 +151,12 @@ export function Header() {
             <hr className="my-2" />
             {user ? (
               <>
+                <Button size="sm" className="w-full justify-start gap-2" asChild>
+                  <Link to="/publish" onClick={() => setMobileMenuOpen(false)}>
+                    <Plus className="h-4 w-4" />
+                    Anunciar Carta
+                  </Link>
+                </Button>
                 <Link
                   to="/perfil"
                   className="text-sm font-medium py-2"
@@ -159,6 +177,13 @@ export function Header() {
                   onClick={() => setMobileMenuOpen(false)}
                 >
                   Negociações
+                </Link>
+                <Link
+                  to="/expert"
+                  className="text-sm font-medium py-2"
+                  onClick={() => setMobileMenuOpen(false)}
+                >
+                  Painel Especialista
                 </Link>
                 <Button
                   variant="outline"
