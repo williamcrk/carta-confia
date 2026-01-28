@@ -1,20 +1,24 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { 
-  Search, 
-  Filter, 
-  Home, 
-  Car, 
-  ArrowUpDown, 
+import {
+  Search,
+  Filter,
+  Home,
+  Car,
+  ArrowUpDown,
   CheckCircle,
   Shield,
   Eye,
-  TrendingUp
+  TrendingUp,
+  Heart,
+  MessageCircle,
+  Phone
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   Select,
   SelectContent,
@@ -25,8 +29,37 @@ import {
 import { Slider } from "@/components/ui/slider";
 import { Header } from "@/components/layout/Header";
 import { Footer } from "@/components/layout/Footer";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
+import { useToast } from "@/hooks/use-toast";
 
-// Mock data for listings
+interface ListingData {
+  id: string;
+  type?: string;
+  consortium_type?: string;
+  creditValue?: number;
+  credit_value?: number;
+  administrator: string;
+  paidPercentage?: number;
+  paid_percentage?: number;
+  entryValue?: number;
+  entry_value?: number;
+  description?: string;
+  isVerified?: boolean;
+  is_partner_approved?: boolean;
+  viewsCount?: number;
+  views_count?: number;
+  createdAt?: string;
+  created_at?: string;
+  seller_id?: string;
+  seller?: {
+    full_name: string;
+    avatar_url: string;
+  };
+  status?: string;
+}
+
+// Mock data for listings (fallback)
 const mockListings = [
   {
     id: "1",
@@ -117,29 +150,105 @@ export default function Marketplace() {
   const [sortBy, setSortBy] = useState("recent");
   const [priceRange, setPriceRange] = useState([0, 500000]);
   const [showFilters, setShowFilters] = useState(false);
+  const [listings, setListings] = useState<ListingData[]>(mockListings);
+  const [loading, setLoading] = useState(true);
+  const { user } = useAuth();
+  const { toast } = useToast();
+
+  useEffect(() => {
+    loadListings();
+  }, []);
+
+  const loadListings = async () => {
+    try {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from("listings")
+        .select(`
+          *,
+          seller:seller_id(full_name, avatar_url)
+        `)
+        .eq("status", "published")
+        .order("created_at", { ascending: false });
+
+      if (error) throw error;
+
+      if (data && data.length > 0) {
+        setListings(data);
+      }
+    } catch (error) {
+      console.error("Erro ao carregar anúncios:", error);
+      setListings(mockListings);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleWhatsAppContact = (listingAdmin: string, creditValue: number) => {
+    const phone = "5511999999999";
+    const message = encodeURIComponent(
+      `Olá! Tenho interesse na carta de consórcio: ${listingAdmin} - Valor: R$ ${creditValue.toLocaleString("pt-BR")}`
+    );
+    window.open(`https://wa.me/${phone}?text=${message}`, "_blank");
+  };
+
+  const handleExpertContact = async (listingId: string, listingAdmin: string) => {
+    if (!user) {
+      toast({
+        title: "Faça login",
+        description: "Você precisa estar logado para contatar um especialista.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      await supabase.from("expert_contacts").insert({
+        user_id: user.id,
+        listing_id: listingId,
+        contact_type: "whatsapp",
+      });
+
+      const expertPhone = "5511988888888";
+      const message = encodeURIComponent(
+        `Quero falar com um especialista sobre a carta: ${listingAdmin}`
+      );
+      window.open(`https://wa.me/${expertPhone}?text=${message}`, "_blank");
+    } catch (error) {
+      console.error("Erro ao contatar especialista:", error);
+    }
+  };
 
   // Filter listings
-  const filteredListings = mockListings.filter((listing) => {
-    const matchesType = typeFilter === "all" || listing.type === typeFilter;
+  const filteredListings = listings.filter((listing) => {
+    const consortiumType = listing.consortium_type || listing.type;
+    const creditValue = listing.credit_value || listing.creditValue || 0;
+    const matchesType = typeFilter === "all" || consortiumType === typeFilter;
     const matchesSearch =
       listing.administrator.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      listing.description.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesPrice =
-      listing.creditValue >= priceRange[0] && listing.creditValue <= priceRange[1];
+      (listing.description && listing.description.toLowerCase().includes(searchTerm.toLowerCase()));
+    const matchesPrice = creditValue >= priceRange[0] && creditValue <= priceRange[1];
     return matchesType && matchesSearch && matchesPrice;
   });
 
   // Sort listings
   const sortedListings = [...filteredListings].sort((a, b) => {
+    const creditValueA = a.credit_value || a.creditValue || 0;
+    const creditValueB = b.credit_value || b.creditValue || 0;
+    const viewsA = a.views_count || a.viewsCount || 0;
+    const viewsB = b.views_count || b.viewsCount || 0;
+    const dateA = new Date(a.created_at || a.createdAt || 0).getTime();
+    const dateB = new Date(b.created_at || b.createdAt || 0).getTime();
+
     switch (sortBy) {
       case "price-asc":
-        return a.creditValue - b.creditValue;
+        return creditValueA - creditValueB;
       case "price-desc":
-        return b.creditValue - a.creditValue;
+        return creditValueB - creditValueA;
       case "views":
-        return b.viewsCount - a.viewsCount;
+        return viewsB - viewsA;
       default:
-        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+        return dateB - dateA;
     }
   });
 
@@ -324,21 +433,55 @@ export default function Marketplace() {
               </p>
 
               {/* Listings Grid */}
-              {sortedListings.length > 0 ? (
+              {loading ? (
+                <div className="text-center py-12">
+                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
+                  <p className="mt-4 text-muted-foreground">Carregando cartas...</p>
+                </div>
+              ) : sortedListings.length > 0 ? (
                 <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-6">
-                  {sortedListings.map((listing) => (
+                  {sortedListings.map((listing) => {
+                    const consortiumType = listing.consortium_type || listing.type;
+                    const creditValue = listing.credit_value || listing.creditValue || 0;
+                    const paidPercentage = listing.paid_percentage || listing.paidPercentage || 0;
+                    const entryValue = listing.entry_value || listing.entryValue || 0;
+                    const isVerified = listing.is_partner_approved || listing.isVerified;
+                    const views = listing.views_count || listing.viewsCount || 0;
+
+                    return (
                     <Card key={listing.id} className="card-hover overflow-hidden">
                       <CardContent className="p-6">
-                        {/* Header */}
-                        <div className="flex items-start justify-between mb-4">
+                        {/* Seller Info with Photo */}
+                        <div className="flex items-center justify-between mb-4">
+                          <div className="flex items-center gap-3">
+                            <Avatar>
+                              <AvatarImage src={listing.seller?.avatar_url} />
+                              <AvatarFallback>
+                                {listing.seller?.full_name?.charAt(0) || "V"}
+                              </AvatarFallback>
+                            </Avatar>
+                            <div className="flex-1 min-w-0">
+                              <p className="font-semibold text-sm truncate">
+                                {listing.seller?.full_name || "Vendedor"}
+                              </p>
+                              {isVerified && (
+                                <p className="text-xs text-success">✓ Verificado</p>
+                              )}
+                            </div>
+                          </div>
+                          <Heart className="h-5 w-5 text-muted-foreground hover:text-red-500 cursor-pointer" />
+                        </div>
+
+                        {/* Type Badge */}
+                        <div className="flex gap-2 mb-4">
                           <Badge
                             className={
-                              listing.type === "property"
+                              consortiumType === "property"
                                 ? "type-property"
                                 : "type-vehicle"
                             }
                           >
-                            {listing.type === "property" ? (
+                            {consortiumType === "property" ? (
                               <>
                                 <Home className="h-3 w-3 mr-1" />
                                 Imóvel
@@ -350,19 +493,14 @@ export default function Marketplace() {
                               </>
                             )}
                           </Badge>
-                          {listing.isVerified && (
-                            <div className="trust-badge status-verified">
-                              <CheckCircle className="h-3 w-3" />
-                              Verificado
-                            </div>
-                          )}
+                          <Badge variant="outline">{paidPercentage}% pago</Badge>
                         </div>
 
                         {/* Credit Value */}
                         <div className="mb-4">
                           <p className="text-sm text-muted-foreground">Valor do Crédito</p>
                           <p className="text-2xl font-bold text-primary">
-                            {formatCurrency(listing.creditValue)}
+                            {formatCurrency(creditValue)}
                           </p>
                         </div>
 
@@ -374,45 +512,59 @@ export default function Marketplace() {
                           </div>
                           <div className="flex justify-between text-sm">
                             <span className="text-muted-foreground">% Pago</span>
-                            <span className="font-medium">{listing.paidPercentage}%</span>
+                            <span className="font-medium">{paidPercentage}%</span>
                           </div>
                           <div className="flex justify-between text-sm">
                             <span className="text-muted-foreground">Entrada</span>
                             <span className="font-medium text-success">
-                              {formatCurrency(listing.entryValue)}
+                              {formatCurrency(entryValue)}
                             </span>
                           </div>
                         </div>
 
                         {/* Description */}
                         <p className="text-sm text-muted-foreground line-clamp-2 mb-4">
-                          {listing.description}
+                          {listing.description || "Sem descrição"}
                         </p>
 
                         {/* Stats */}
-                        <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                        <div className="flex items-center gap-4 text-xs text-muted-foreground mb-4">
                           <span className="flex items-center gap-1">
                             <Eye className="h-3 w-3" />
-                            {listing.viewsCount} visualizações
+                            {views} visualizações
                           </span>
-                          {listing.isVerified && (
+                          {isVerified && (
                             <span className="flex items-center gap-1">
                               <Shield className="h-3 w-3 text-success" />
-                              Parceira
+                              Verificado
                             </span>
                           )}
                         </div>
+
+                        {/* Action Buttons */}
+                        <div className="flex gap-2">
+                          <Button
+                            className="flex-1"
+                            size="sm"
+                            onClick={() => handleWhatsAppContact(listing.administrator, creditValue)}
+                          >
+                            <MessageCircle className="mr-2 h-4 w-4" />
+                            WhatsApp
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="flex-1"
+                            onClick={() => handleExpertContact(listing.id, listing.administrator)}
+                          >
+                            <Phone className="mr-2 h-4 w-4" />
+                            Especialista
+                          </Button>
+                        </div>
                       </CardContent>
-                      <CardFooter className="p-6 pt-0">
-                        <Button className="w-full" asChild>
-                          <Link to={`/carta/${listing.id}`}>
-                            <TrendingUp className="h-4 w-4 mr-2" />
-                            Ver Detalhes
-                          </Link>
-                        </Button>
-                      </CardFooter>
                     </Card>
-                  ))}
+                    );
+                  })}
                 </div>
               ) : (
                 <Card>
